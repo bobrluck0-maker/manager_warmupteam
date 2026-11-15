@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Опрос команды — Удобство и сервис</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.25s ease, color 0.25s ease;
+        }
+        .rating-btn {
+            transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .rating-btn:active {
+            transform: scale(0.96);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.25s ease-out forwards;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.45);
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-900 dark:bg-[#080b14] dark:text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
+
+    <!-- Контейнер всплывающих уведомлений (вместо alert) -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- ========================================================================= -->
+    <!-- МОДАЛЬНОЕ ОКНО: ВХОД В CRM КУРАТОРА (БЕЗ ПОДСКАЗОК И БЕЗ УПОМИНАНИЯ ЮЗА) -->
+    <!-- ========================================================================= -->
+    <div id="crmLoginModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800/90 rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-fade-in space-y-5">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center">
+                        <i class="fa-solid fa-user-shield text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-slate-900 dark:text-white">Закрытая панель управления</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Авторизация доступа</p>
+                    </div>
+                </div>
+                <button type="button" onclick="toggleModal('crmLoginModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    КЛЮЧ ДОСТУПА
+                </label>
+                <div class="relative">
+                    <input
+                        type="password"
+                        id="crmSecretInput"
+                        placeholder="••••••••"
+                        autocomplete="off"
+                        onkeydown="if(event.key==='Enter') unlockCrmView()"
+                        class="w-full pl-3.5 pr-10 py-3 rounded-xl bg-slate-50 dark:bg-[#0b0f1a] border border-slate-200 dark:border-slate-800 text-sm focus:outline-none focus:border-indigo-500 transition tracking-widest"
+                    >
+                    <button
+                        type="button"
+                        onclick="togglePasswordVisibility()"
+                        class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-300 transition"
+                        title="Показать / скрыть"
+                    >
+                        <i id="eyeIcon" class="fa-regular fa-eye text-sm"></i>
+                    </button>
+                </div>
+                <p id="crmLoginError" class="hidden text-xs text-rose-500 font-medium pt-0.5">
+                    <i class="fa-solid fa-circle-exclamation mr-1"></i> Неверный ключ доступа
+                </p>
+            </div>
+
+            <div class="flex items-center justify-end gap-2.5 pt-1">
+                <button type="button" onclick="toggleModal('crmLoginModal')" class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition">
+                    Отмена
+                </button>
+                <button type="button" onclick="unlockCrmView()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition">
+                    Открыть CRM
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- МОДАЛЬНОЕ ОКНО: НАСТРОЙКА ПУБЛИЧНОГО ДОМЕНА CRM И СКАЧИВАНИЕ ФАЙЛА        -->
+    <!-- ========================================================================= -->
+    <div id="domainModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl animate-fade-in space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3.5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                        <i class="fa-solid fa-globe text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base">Как сделать красивую ссылку (домен CRM)</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Чтобы скидывать опрос любому человеку на телефон или ПК</p>
+                    </div>
+                </div>
+                <button type="button" onclick="toggleModal('domainModal')" class="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-2">
+                    <div class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span class="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center">1</span>
+                        Быстрая ссылка через кнопку Share
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        Нажмите кнопку <b>Share / Поделиться</b> в правом верхнем углу окна предпросмотра — скопируйте публичную ссылку и отправьте сотрудникам.
+                    </p>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                    <div class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span class="w-5 h-5 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center">2</span>
+                        Свой домен вида <code class="text-emerald-400">https://crm-team.netlify.app</code> за 10 секунд
+                    </div>
+                    <ol class="list-decimal list-inside space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                        <li>Нажмите кнопку <b>«Скачать файл index.html»</b> ниже.</li>
+                        <li>Перетащите скачанный файл на страницу <b>drop.netlify.com</b> или <b>vercel.com</b>.</li>
+                        <li>Вы мгновенно получите красивую внешнюю ссылку: сотрудники будут видеть только опрос, а вы по кнопке <b>🔒 CRM</b> внизу страницы сможете заходить в свою CRM.</li>
+                    </ol>
+                    <button type="button" onclick="downloadStandaloneHtml()" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition">
+                        <i class="fa-solid fa-download"></i> Скачать файл index.html
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-1">
+                <button type="button" onclick="toggleModal('domainModal')" class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-semibold">
+                    Понятно
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- МОДАЛЬНОЕ ОКНО: БЕЗОПАСНАЯ НАСТРОЙКА TELEGRAM (БЕЗ GETUPDATES)            -->
+    <!-- ========================================================================= -->
+    <div id="tgSetupModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl animate-fade-in space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-sky-500/15 text-sky-400 flex items-center justify-center">
+                        <i class="fa-brands fa-telegram text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base">Дублирование анкет в Telegram</h3>
+                        <p class="text-[11px] text-emerald-400 font-medium">Безопасный режим (только односторонняя отправка)</p>
+                    </div>
+                </div>
+                <button type="button" onclick="toggleModal('tgSetupModal')" class="text-slate-400 hover:text-slate-200 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="text-xs text-slate-500 dark:text-slate-400 space-y-2 leading-relaxed">
+                <p>
+                    Все анкеты сотрудников уже <b>автоматически сохраняются в эту CRM</b>. Если хотите, чтобы бот дополнительно присылал копию анкеты вам в личку:
+                </p>
+                <ol class="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-300">
+                    <li>Напишите своему боту <b>/start</b>.</li>
+                    <li>Узнайте свой цифровой <b>Chat ID</b> (например, через <code class="text-sky-400">@userinfobot</code> в TG).</li>
+                    <li>Вставьте ваш цифровой ID ниже и нажмите «Сохранить».</li>
+                </ol>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Ваш цифровой Telegram Chat ID (необязательно)
+                </label>
+                <input
+                    type="text"
+                    id="curatorChatIdInput"
+                    placeholder="Например: 718293045"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-[#0b0f1a] border border-slate-200 dark:border-slate-800 text-sm focus:outline-none focus:border-sky-500"
+                >
+            </div>
+
+            <div class="flex items-center justify-between gap-2 pt-2">
+                <button type="button" onclick="testTelegramPush()" class="px-3.5 py-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-400 text-xs font-semibold transition">
+                    <i class="fa-regular fa-paper-plane mr-1"></i> Проверить отправку
+                </button>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="toggleModal('tgSetupModal')" class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-semibold">
+                        Закрыть
+                    </button>
+                    <button type="button" onclick="saveCuratorChatId()" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25">
+                        Сохранить ID
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- РЕЖИМ 1: ЧИСТЫЙ ОПРОС ДЛЯ СОТРУДНИКОВ (ОТКРЫВАЕТСЯ ПО УМОЛЧАНИЮ)          -->
+    <!-- ========================================================================= -->
+    <div id="surveyView" class="flex-1 flex flex-col justify-between py-6 px-4 sm:px-6">
+        <div class="max-w-xl w-full mx-auto space-y-5">
+
+            <!-- Верхняя карточка-шапка опроса -->
+            <div class="bg-white dark:bg-[#111625] rounded-2xl border border-slate-200 dark:border-slate-800/90 p-5 shadow-sm flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3.5">
+                    <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 shrink-0">
+                        <i class="fa-brands fa-tiktok text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h1 class="font-extrabold text-base sm:text-lg tracking-tight">Опрос команды: Удобство и сервис</h1>
+                        </div>
+                        <div class="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Этап: В работе (прогрев TikTok)
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Переключатель темы -->
+                <button type="button" onclick="toggleTheme()" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/80 transition shrink-0" title="Тема оформления">
+                    <i class="fa-solid fa-sun hidden dark:inline-block text-amber-400"></i>
+                    <i class="fa-solid fa-moon inline-block dark:hidden text-slate-700"></i>
+                </button>
+            </div>
+
+            <!-- Основная карточка анкеты -->
+            <div id="surveyFormCard" class="bg-white dark:bg-[#111625] rounded-2xl border border-slate-200 dark:border-slate-800/90 p-5 sm:p-6 shadow-sm space-y-6">
+
+                <!-- 1. Ник сотрудника в Telegram (полностью пустое поле по умолчанию) -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                        Ваш ник в Telegram <span class="text-rose-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-indigo-400">
+                            <i class="fa-brands fa-telegram text-base"></i>
+                        </span>
+                        <input
+                            type="text"
+                            id="empUsername"
+                            value=""
+                            autocomplete="off"
+                            placeholder="Введите ваш @username"
+                            class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-[#0b0f1a] border border-slate-200 dark:border-slate-800 text-sm focus:outline-none focus:border-indigo-500 transition"
+                        >
+                    </div>
+                </div>
+
+                <!-- 2. Вопросы с кнопками «Плохо» / «Хорошо» / «Отлично» (НИ ОДНА НЕ ВЫБРАНА ПО УМОЛЧАНИЮ) -->
+                <div class="space-y-4">
+                    <!-- Вопрос 1 -->
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-[#0b0f1a] border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+                        <div class="text-xs sm:text-sm font-semibold leading-snug">
+                            1. Насколько удобен наш сервис и рабочие инструменты (прокси, аккаунты, таблицы)? <span class="text-rose-500">*</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="setRating('q1', 'bad')" class="rating-btn q1-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="bad">
+                                <i class="fa-regular fa-face-frown text-rose-500"></i> Плохо
+                            </button>
+                            <button type="button" onclick="setRating('q1', 'good')" class="rating-btn q1-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="good">
+                                <i class="fa-regular fa-face-smile text-amber-400"></i> Хорошо
+                            </button>
+                            <button type="button" onclick="setRating('q1', 'great')" class="rating-btn q1-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="great">
+                                <i class="fa-regular fa-face-grin-stars text-emerald-400"></i> Отлично
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Вопрос 2 -->
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-[#0b0f1a] border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+                        <div class="text-xs sm:text-sm font-semibold leading-snug">
+                            2. Насколько понятны мануалы, шаблоны и алгоритмы прогрева TikTok? <span class="text-rose-500">*</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="setRating('q2', 'bad')" class="rating-btn q2-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="bad">
+                                <i class="fa-regular fa-face-frown text-rose-500"></i> Плохо
+                            </button>
+                            <button type="button" onclick="setRating('q2', 'good')" class="rating-btn q2-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="good">
+                                <i class="fa-regular fa-face-smile text-amber-400"></i> Хорошо
+                            </button>
+                            <button type="button" onclick="setRating('q2', 'great')" class="rating-btn q2-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="great">
+                                <i class="fa-regular fa-face-grin-stars text-emerald-400"></i> Отлично
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Вопрос 3 -->
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-[#0b0f1a] border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+                        <div class="text-xs sm:text-sm font-semibold leading-snug">
+                            3. Как вы оцениваете удобство и стабильность работы на вашем устройстве? <span class="text-rose-500">*</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="setRating('q3', 'bad')" class="rating-btn q3-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="bad">
+                                <i class="fa-regular fa-face-frown text-rose-500"></i> Плохо
+                            </button>
+                            <button type="button" onclick="setRating('q3', 'good')" class="rating-btn q3-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="good">
+                                <i class="fa-regular fa-face-smile text-amber-400"></i> Хорошо
+                            </button>
+                            <button type="button" onclick="setRating('q3', 'great')" class="rating-btn q3-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="great">
+                                <i class="fa-regular fa-face-grin-stars text-emerald-400"></i> Отлично
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Вопрос 4 -->
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-[#0b0f1a] border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+                        <div class="text-xs sm:text-sm font-semibold leading-snug">
+                            4. Насколько быстро и понятно помогает куратор при разборе вопросов? <span class="text-rose-500">*</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="setRating('q4', 'bad')" class="rating-btn q4-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="bad">
+                                <i class="fa-regular fa-face-frown text-rose-500"></i> Плохо
+                            </button>
+                            <button type="button" onclick="setRating('q4', 'good')" class="rating-btn q4-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="good">
+                                <i class="fa-regular fa-face-smile text-amber-400"></i> Хорошо
+                            </button>
+                            <button type="button" onclick="setRating('q4', 'great')" class="rating-btn q4-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="great">
+                                <i class="fa-regular fa-face-grin-stars text-emerald-400"></i> Отлично
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Вопрос 5 -->
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-[#0b0f1a] border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+                        <div class="text-xs sm:text-sm font-semibold leading-snug">
+                            5. Насколько удобна и прозрачна система учета аккаунтов и выплат? <span class="text-rose-500">*</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="setRating('q5', 'bad')" class="rating-btn q5-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="bad">
+                                <i class="fa-regular fa-face-frown text-rose-500"></i> Плохо
+                            </button>
+                            <button type="button" onclick="setRating('q5', 'good')" class="rating-btn q5-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="good">
+                                <i class="fa-regular fa-face-smile text-amber-400"></i> Хорошо
+                            </button>
+                            <button type="button" onclick="setRating('q5', 'great')" class="rating-btn q5-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5" data-val="great">
+                                <i class="fa-regular fa-face-grin-stars text-emerald-400"></i> Отлично
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. С чем возникают сложности + Кнопка «🆘 Нужна помощь куратора» (ВСЁ НЕАКТИВНО ПО УМОЛЧАНИЮ, БЕЗ АВТО-ТЕКСТА) -->
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                        С чем возникают сложности? (необязательно, выберите при необходимости)
+                    </label>
+                    <div class="flex flex-wrap gap-2" id="painPointsGroup">
+                        <button type="button" onclick="toggleTag(this)" data-tag="Смена гео / прокси" class="pain-tag px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0b0f1a] text-slate-600 dark:text-slate-300 hover:border-indigo-500/60 transition">
+                            🌍 Смена гео / прокси
+                        </button>
+                        <button type="button" onclick="toggleTag(this)" data-tag="Теневые баны TikTok" class="pain-tag px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0b0f1a] text-slate-600 dark:text-slate-300 hover:border-indigo-500/60 transition">
+                            📉 Теневые баны TikTok
+                        </button>
+                        <button type="button" onclick="toggleTag(this)" data-tag="Нехватка шаблонов" class="pain-tag px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0b0f1a] text-slate-600 dark:text-slate-300 hover:border-indigo-500/60 transition">
+                            📋 Нехватка шаблонов
+                        </button>
+                        <button type="button" onclick="toggleTag(this)" data-tag="Вопросы по таймингам" class="pain-tag px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0b0f1a] text-slate-600 dark:text-slate-300 hover:border-indigo-500/60 transition">
+                            ⏱️ Вопросы по таймингам
+                        </button>
+                        <!-- Кнопка «Нужна помощь куратора» (не нажата по умолчанию, открывает поле только по клику пользователя) -->
+                        <button
+                            type="button"
+                            id="needCuratorHelpBtn"
+                            onclick="toggleCuratorHelp()"
+                            class="px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0b0f1a] text-rose-500 dark:text-rose-400 hover:border-rose-500/50 flex items-center gap-1.5 transition"
+                        >
+                            <span>🆘 Нужна помощь куратора</span>
+                        </button>
+                    </div>
+
+                    <!-- Раскрывающееся поле при нажатии «Нужна помощь куратора» (скрыто по умолчанию) -->
+                    <div id="curatorHelpContainer" class="hidden pt-2 animate-fade-in">
+                        <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-2">
+                            <label class="block text-xs font-bold text-rose-500 dark:text-rose-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-life-ring"></i>
+                                Опишите проблему, с которой вы столкнулись: <span class="text-rose-500">*</span>
+                            </label>
+                            <textarea
+                                id="curatorHelpText"
+                                rows="3"
+                                placeholder="Напишите своими словами, какая возникла проблема и чем вам помочь..."
+                                class="w-full p-3 rounded-xl bg-white dark:bg-[#0b0f1a] border border-rose-500/30 text-sm focus:outline-none focus:border-rose-500 transition resize-none"
+                            ></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Общее поле «Ваше мнение и предложения» -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                        Ваше мнение и предложения
+                    </label>
+                    <textarea
+                        id="empOpinion"
+                        rows="3"
+                        placeholder="Напишите ваше мнение о работе, удобстве сервиса или предложения..."
+                        class="w-full p-3.5 rounded-xl bg-slate-50 dark:bg-[#0b0f1a] border border-slate-200 dark:border-slate-800 text-sm focus:outline-none focus:border-indigo-500 transition resize-none"
+                    ></textarea>
+                </div>
+
+                <!-- Кнопка отправки -->
+                <button
+                    type="button"
+                    id="submitSurveyBtn"
+                    onclick="submitEmployeeSurvey()"
+                    class="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 transition"
+                >
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Отправить анкету</span>
+                </button>
+            </div>
+
+            <!-- Экран успешной отправки (скрыт по умолчанию) -->
+            <div id="surveySuccessCard" class="hidden bg-white dark:bg-[#111625] rounded-2xl border border-emerald-500/30 p-7 text-center shadow-lg space-y-4 animate-fade-in">
+                <div class="w-16 h-16 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mx-auto text-3xl">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div class="space-y-1">
+                    <h2 class="text-xl font-extrabold">Спасибо! Ваш ответ отправлен</h2>
+                    <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                        Анкета передана куратору в CRM. Если вы запросили помощь, куратор свяжется с вами в Telegram.
+                    </p>
+                </div>
+                <div class="pt-2">
+                    <button type="button" onclick="resetSurveyForm()" class="px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold transition">
+                        Отправить еще один ответ
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Нижняя панель с незаметной кнопкой входа в CRM для куратора -->
+        <div class="max-w-xl w-full mx-auto mt-8 pt-4 border-t border-slate-200/60 dark:border-slate-800/50 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Опрос команды • Прогрев TikTok</span>
+            <button
+                type="button"
+                onclick="openCrmLoginModal()"
+                class="px-2.5 py-1 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-1.5 transition"
+                title="Вход для куратора"
+            >
+                <i class="fa-solid fa-lock text-[10px]"></i>
+                <span>CRM</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- РЕЖИМ 2: ЗАКРЫТАЯ CRM-СТРАНИЦА КУРАТОРА (ДОСТУПНА ПОСЛЕ ВВОДА КЛЮЧА)      -->
+    <!-- ========================================================================= -->
+    <div id="crmView" class="hidden flex-1 flex flex-col">
+        <!-- Шапка CRM -->
+        <header class="sticky top-0 z-40 bg-white/90 dark:bg-[#0d1220]/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="font-extrabold text-base sm:text-lg">CRM Куратора — Анкеты команды</h1>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">Live Cloud</span>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Отображаются только реальные ответы, отправленные сотрудниками</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button type="button" onclick="downloadStandaloneHtml()" class="px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border border-emerald-500/20 text-xs font-bold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Скачать файл index.html</span>
+                    </button>
+                    <button type="button" onclick="toggleModal('domainModal')" class="px-3 py-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20 text-xs font-bold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-link"></i>
+                        <span>Домен CRM</span>
+                    </button>
+                    <button type="button" onclick="toggleModal('tgSetupModal')" class="px-3 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-500 dark:text-sky-400 border border-sky-500/20 text-xs font-bold flex items-center gap-1.5 transition">
+                        <i class="fa-brands fa-telegram"></i>
+                        <span>TG-уведомления</span>
+                    </button>
+                    <button type="button" onclick="switchToSurveyView()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>К странице опроса</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Основной контент CRM -->
+        <main class="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6 flex-1">
+            <!-- Карточки статистики -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white dark:bg-[#111625] p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
+                        <span>Всего анкет</span>
+                        <i class="fa-solid fa-inbox text-indigo-400 text-sm"></i>
+                    </div>
+                    <div class="text-2xl font-extrabold mt-2" id="crmTotalCount">0</div>
+                    <p class="text-xs text-slate-500 mt-0.5">Этап: В работе (прогрев TikTok)</p>
+                </div>
+
+                <div class="bg-white dark:bg-[#111625] p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
+                        <span>Индекс удобства</span>
+                        <i class="fa-solid fa-face-smile-beam text-emerald-400 text-sm"></i>
+                    </div>
+                    <div class="text-2xl font-extrabold mt-2 text-emerald-400" id="crmAvgComfort">—</div>
+                    <p class="text-xs text-slate-500 mt-0.5">По реальным оценкам команды</p>
+                </div>
+
+                <div class="bg-white dark:bg-[#111625] p-4 rounded-2xl border border-rose-500/30">
+                    <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-rose-400">
+                        <span>Нужна помощь куратора</span>
+                        <i class="fa-solid fa-life-ring text-rose-500 text-sm"></i>
+                    </div>
+                    <div class="text-2xl font-extrabold mt-2 text-rose-500" id="crmHelpCount">0</div>
+                    <p class="text-xs text-slate-500 mt-0.5">Активных запросов от команды</p>
+                </div>
+
+                <div class="bg-white dark:bg-[#111625] p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
+                        <span>Канал получения</span>
+                        <i class="fa-solid fa-cloud-arrow-down text-sky-400 text-sm"></i>
+                    </div>
+                    <div class="text-base font-extrabold mt-2 text-sky-400" id="crmChannelStatus">Облачная CRM</div>
+                    <p class="text-xs text-slate-500 mt-0.5" id="crmChannelSub">Синхронизация со всех устройств</p>
+                </div>
+            </section>
+
+            <!-- Фильтры, поиск и кнопка очистки всех анкет -->
+            <section class="bg-white dark:bg-[#111625] p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="setCrmFilter('all')" id="flt-all" class="crm-flt px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white transition">
+                        Все анкеты
+                    </button>
+                    <button type="button" onclick="setCrmFilter('help')" id="flt-help" class="crm-flt px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-rose-400 hover:bg-rose-500/15 transition">
+                        🆘 Нужна помощь куратора
+                    </button>
+                    <button type="button" onclick="setCrmFilter('unread')" id="flt-unread" class="crm-flt px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-amber-400 hover:bg-amber-500/15 transition">
+                        Новые (неразобранные)
+                    </button>
+                    <button type="button" onclick="setCrmFilter('bad')" id="flt-bad" class="crm-flt px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition">
+                        С оценкой «Плохо»
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <div class="relative flex-1 sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                        <input
+                            type="text"
+                            id="crmSearchInput"
+                            oninput="renderCrmSubmissions()"
+                            placeholder="Поиск по @username или тексту..."
+                            class="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-50 dark:bg-[#0b0f1a] border border-slate-200 dark:border-slate-800 text-xs focus:outline-none focus:border-indigo-500"
+                        >
+                    </div>
+                    <button
+                        type="button"
+                        onclick="clearAllSubmissions()"
+                        class="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 border border-rose-500/20 text-xs font-bold shrink-0 transition"
+                        title="Удалить все анкеты"
+                    >
+                        <i class="fa-solid fa-trash-can mr-1"></i> Очистить все
+                    </button>
+                </div>
+            </section>
+
+            <!-- Живая лента анкет сотрудников -->
+            <section id="crmSubmissionsList" class="space-y-4">
+                <!-- Наполняется только реальными анкетами -->
+            </section>
+        </main>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- ЛОГИКА ОПРОСА, ЗАЩИЩЕННОЙ CRM И ОБЛАЧНОЙ СИНХРОНИЗАЦИИ                    -->
+    <!-- ========================================================================= -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, addDoc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 1. Константы и начальное состояние (НИКАКИХ ПРЕДВЫБРАННЫХ ОЦЕНОК ИЛИ ДАННЫХ)
+        const TG_BOT_TOKEN = "9041106403:AAFsXkWX054YLt2VlRlPwMJTZhAs9tHIutU";
+        const FIXED_STAGE = "В работе (прогрев TikTok)";
+
+        let currentRatings = {
+            q1: null,
+            q2: null,
+            q3: null,
+            q4: null,
+            q5: null
+        };
+        let needCuratorHelpActive = false;
+        let isCrmUnlocked = false;
+        let currentCrmFilter = 'all';
+        let savedTelegramChatId = "";
+
+        const questionLabels = {
+            q1: '1. Сервис и инструменты',
+            q2: '2. Мануалы и шаблоны',
+            q3: '3. Стабильность устройства',
+            q4: '4. Помощь куратора',
+            q5: '5. Учет и выплаты'
+        };
+
+        // Список анкет изначально полностью пустой — никаких фейковых worker_01 / worker_02
+        let submissions = [];
+
+        // 2. Инициализация Firebase Firestore (согласно 3 обязательным правилам)
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        async function initCloudStorage() {
+            try {
+                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+                    renderCrmSubmissions();
+                    return;
+                }
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Правило 3: Строго сначала авторизация
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, async (user) => {
+                    currentUser = user;
+                    if (!user) return;
+
+                    // Загружаем сохраненный Chat ID куратора (если был указан)
+                    try {
+                        const cfgRef = doc(db, 'artifacts', appId, 'public', 'data', 'crm_settings', 'telegram_config');
+                        const cfgSnap = await getDoc(cfgRef);
+                        if (cfgSnap.exists() && cfgSnap.data().chatId) {
+                            savedTelegramChatId = String(cfgSnap.data().chatId).trim();
+                            document.getElementById('curatorChatIdInput').value = savedTelegramChatId;
+                            updateTgStatusUi();
+                        }
+                    } catch (e) {
+                        console.warn('Не удалось прочитать настройки TG:', e);
+                    }
+
+                    // Правило 1 и 2: Подписка на публичную коллекцию реальных анкет
+                    const surveyCol = collection(db, 'artifacts', appId, 'public', 'data', 'survey_responses');
+                    onSnapshot(
+                        surveyCol,
+                        (snapshot) => {
+                            const cloudItems = [];
+                            snapshot.forEach((docSnap) => {
+                                cloudItems.push({ id: docSnap.id, ...docSnap.data() });
+                            });
+                            // Сортируем по времени (новые сверху) и записываем ровно то, что есть в базе
+                            cloudItems.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                            submissions = cloudItems;
+                            renderCrmSubmissions();
+                        },
+                        (error) => {
+                            console.error('Ошибка синхронизации анкет:', error);
+                        }
+                    );
+                });
+            } catch (err) {
+                console.warn('Работаем в автономном режиме памяти:', err);
+                renderCrmSubmissions();
+            }
+        }
+
+        // 3. Управление кнопками «Плохо» / «Хорошо» / «Отлично»
+        window.setRating = function(questionId, value) {
+            currentRatings[questionId] = value;
+            const buttons = document.querySelectorAll(`.${questionId}-btn`);
+            buttons.forEach(btn => {
+                const v = btn.getAttribute('data-val');
+                btn.className = `rating-btn ${questionId}-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border flex items-center justify-center gap-1.5 `;
+                if (v === value) {
+                    if (value === 'bad') {
+                        btn.className += 'border-rose-500 bg-rose-500/15 text-rose-600 dark:text-rose-300 shadow-sm';
+                    } else if (value === 'good') {
+                        btn.className += 'border-amber-500 bg-amber-500/15 text-amber-600 dark:text-amber-300 shadow-sm';
+                    } else {
+                        btn.className += 'border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 shadow-sm';
+                    }
+                } else {
+                    btn.className += 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400';
+                }
+            });
+        };
+
+        // 4. Переключение тегов сложностей (БЕЗ КАКОГО-ЛИБО АВТОМАТИЧЕСКОГО ТЕКСТА)
+        window.toggleTag = function(btn) {
+            const active = btn.classList.contains('tag-selected');
+            if (active) {
+                btn.classList.remove('tag-selected', 'border-indigo-500', 'bg-indigo-500/15', 'text-indigo-500', 'dark:text-indigo-300');
+                btn.classList.add('border-slate-200', 'dark:border-slate-800', 'bg-slate-50', 'dark:bg-[#0b0f1a]', 'text-slate-600', 'dark:text-slate-300');
+            } else {
+                btn.classList.add('tag-selected', 'border-indigo-500', 'bg-indigo-500/15', 'text-indigo-500', 'dark:text-indigo-300');
+                btn.classList.remove('border-slate-200', 'dark:border-slate-800', 'bg-slate-50', 'dark:bg-[#0b0f1a]', 'text-slate-600', 'dark:text-slate-300');
+            }
+        };
+
+        // Кнопка «🆘 Нужна помощь куратора» ждет выбора самим пользователем
+        window.toggleCuratorHelp = function() {
+            needCuratorHelpActive = !needCuratorHelpActive;
+            const btn = document.getElementById('needCuratorHelpBtn');
+            const box = document.getElementById('curatorHelpContainer');
+            if (needCuratorHelpActive) {
+                btn.className = 'px-4 py-2 rounded-xl text-xs font-bold border border-rose-500 bg-rose-600 text-white shadow-lg shadow-rose-600/25 flex items-center gap-1.5 transition';
+                box.classList.remove('hidden');
+                setTimeout(() => document.getElementById('curatorHelpText').focus(), 80);
+            } else {
+                btn.className = 'px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0b0f1a] text-rose-500 dark:text-rose-400 hover:border-rose-500/50 flex items-center gap-1.5 transition';
+                box.classList.add('hidden');
+            }
+        };
+
+        // 5. Отправка анкеты сотрудником (сохраняется строго то, что ввел и выбрал сам человек)
+        window.submitEmployeeSurvey = async function() {
+            let rawUsername = document.getElementById('empUsername').value.trim();
+            const opinionText = document.getElementById('empOpinion').value.trim();
+            const helpProblemText = document.getElementById('curatorHelpText').value.trim();
+
+            if (!rawUsername) {
+                showToast('Пожалуйста, введите ваш ник в Telegram (@username)', 'error');
+                document.getElementById('empUsername').focus();
+                return;
+            }
+            const exactUsername = rawUsername.startsWith('@') ? rawUsername : '@' + rawUsername;
+
+            // Проверяем, что сотрудник сам выбрал оценку в каждом из 5 вопросов
+            const unanswered = ['q1', 'q2', 'q3', 'q4', 'q5'].filter(q => !currentRatings[q]);
+            if (unanswered.length > 0) {
+                showToast('Пожалуйста, выберите оценку («Плохо», «Хорошо» или «Отлично») для всех 5 вопросов', 'error');
+                return;
+            }
+
+            // Если сотрудник сам нажал «Нужна помощь куратора», он должен описать проблему своими словами
+            if (needCuratorHelpActive && !helpProblemText) {
+                showToast('Опишите вашу проблему в открывшемся поле помощи куратора', 'error');
+                document.getElementById('curatorHelpText').focus();
+                return;
+            }
+
+            // Собираем только те кнопки сложностей, которые реально нажал сам сотрудник
+            const selectedTags = [];
+            document.querySelectorAll('#painPointsGroup .tag-selected').forEach(el => {
+                selectedTags.push(el.getAttribute('data-tag'));
+            });
+
+            // Расчет общей оценки по ответам пользователя
+            const vals = Object.values(currentRatings);
+            const badCnt = vals.filter(v => v === 'bad').length;
+            const greatCnt = vals.filter(v => v === 'great').length;
+            let overall = 'good';
+            if (badCnt >= 1) overall = 'bad';
+            else if (greatCnt >= 3 && badCnt === 0) overall = 'great';
+
+            const payload = {
+                username: exactUsername,
+                stage: FIXED_STAGE,
+                ratings: { ...currentRatings },
+                overall,
+                tags: selectedTags,
+                needHelp: needCuratorHelpActive,
+                helpProblem: needCuratorHelpActive ? helpProblemText : '',
+                opinion: opinionText !== '' ? opinionText : 'Без комментария',
+                status: 'new',
+                createdAt: Date.now()
+            };
+
+            const submitBtn = document.getElementById('submitSurveyBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Отправка...</span>`;
+
+            // Сохраняем в облачную базу CRM (Firestore)
+            try {
+                if (db && currentUser) {
+                    const surveyCol = collection(db, 'artifacts', appId, 'public', 'data', 'survey_responses');
+                    await addDoc(surveyCol, payload);
+                } else {
+                    submissions.unshift({ id: 'local-' + Date.now(), ...payload });
+                    renderCrmSubmissions();
+                }
+            } catch (err) {
+                console.warn('Локальное сохранение анкеты:', err);
+                submissions.unshift({ id: 'local-' + Date.now(), ...payload });
+                renderCrmSubmissions();
+            }
+
+            // Односторонняя отправка в Telegram (если задан числовой Chat ID)
+            if (savedTelegramChatId) {
+                sendSafeTelegramNotification(payload, savedTelegramChatId);
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Отправить анкету</span>`;
+
+            // Показываем экран успеха
+            document.getElementById('surveyFormCard').classList.add('hidden');
+            document.getElementById('surveySuccessCard').classList.remove('hidden');
+            showToast('Ваш ответ успешно отправлен!', 'success');
+        };
+
+        // Полный сброс формы к чистым значениям (ничего не выбрано)
+        window.resetSurveyForm = function() {
+            document.getElementById('empUsername').value = '';
+            document.getElementById('empOpinion').value = '';
+            document.getElementById('curatorHelpText').value = '';
+
+            // Сбрасываем все оценки
+            currentRatings = { q1: null, q2: null, q3: null, q4: null, q5: null };
+            ['q1', 'q2', 'q3', 'q4', 'q5'].forEach(q => {
+                document.querySelectorAll(`.${q}-btn`).forEach(btn => {
+                    btn.className = `rating-btn ${q}-btn py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111625] text-slate-600 dark:text-slate-300 hover:border-slate-400 flex items-center justify-center gap-1.5`;
+                });
+            });
+
+            // Сбрасываем все кнопки сложностей
+            document.querySelectorAll('#painPointsGroup .pain-tag').forEach(btn => {
+                btn.classList.remove('tag-selected', 'border-indigo-500', 'bg-indigo-500/15', 'text-indigo-500', 'dark:text-indigo-300');
+                btn.classList.add('border-slate-200', 'dark:border-slate-800', 'bg-slate-50', 'dark:bg-[#0b0f1a]', 'text-slate-600', 'dark:text-slate-300');
+            });
+
+            // Сбрасываем кнопку «Нужна помощь куратора»
+            if (needCuratorHelpActive) {
+                toggleCuratorHelp();
+            }
+
+            document.getElementById('surveySuccessCard').classList.add('hidden');
+            document.getElementById('surveyFormCard').classList.remove('hidden');
+        };
+
+        // 6. Безопасная отправка уведомления через POST sendMessage (строго то, что ввел сотрудник)
+        async function sendSafeTelegramNotification(item, chatId) {
+            const wordMap = { great: '🟢 Отлично', good: '🟡 Хорошо', bad: '🔴 Плохо' };
+            const tagsLine = (item.tags && item.tags.length > 0)
+                ? `\n<b>Выбранные сложности:</b> ${item.tags.map(escapeHtml).join(', ')}`
+                : '';
+            const helpBlock = item.needHelp
+                ? `\n\n🆘 <b>НУЖНА ПОМОЩЬ КУРАТОРА:</b>\n${escapeHtml(item.helpProblem)}`
+                : '';
+
+            const text =
+                `📋 <b>Новая анкета сотрудника!</b>\n` +
+                `👤 <b>Сотрудник:</b> ${escapeHtml(item.username)}\n` +
+                `📌 <b>Этап:</b> ${escapeHtml(item.stage)}\n\n` +
+                `<b>Блок 1 — Оценки:</b>\n` +
+                `• Сервис и инструменты: ${wordMap[item.ratings.q1] || '—'}\n` +
+                `• Мануалы и шаблоны: ${wordMap[item.ratings.q2] || '—'}\n` +
+                `• Устройство: ${wordMap[item.ratings.q3] || '—'}\n` +
+                `• Помощь куратора: ${wordMap[item.ratings.q4] || '—'}\n` +
+                `• Учет и выплаты: ${wordMap[item.ratings.q5] || '—'}` +
+                tagsLine +
+                helpBlock +
+                `\n\n💬 <b>Мнение и предложения:</b>\n${escapeHtml(item.opinion || 'Без комментария')}`;
+
+            try {
+                await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: text,
+                        parse_mode: 'HTML'
+                    })
+                });
+            } catch (e) {
+                console.warn('Не удалось продублировать в TG:', e);
+            }
+        }
+
+        // 7. Защищенный вход в CRM Куратора (ключ доступа: whymvk)
+        window.openCrmLoginModal = function() {
+            if (isCrmUnlocked) {
+                showCrmScreen();
+                return;
+            }
+            document.getElementById('crmSecretInput').value = '';
+            document.getElementById('crmLoginError').classList.add('hidden');
+            document.getElementById('crmLoginModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('crmSecretInput').focus(), 80);
+        };
+
+        window.togglePasswordVisibility = function() {
+            const input = document.getElementById('crmSecretInput');
+            const icon = document.getElementById('eyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-regular fa-eye-slash text-sm';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-regular fa-eye text-sm';
+            }
+        };
+
+        window.unlockCrmView = function() {
+            const raw = document.getElementById('crmSecretInput').value.trim().toLowerCase().replace(/^@/, '');
+            const expectedKey = [119, 104, 121, 109, 118, 107].map(c => String.fromCharCode(c)).join('');
+            if (raw === expectedKey) {
+                isCrmUnlocked = true;
+                document.getElementById('crmLoginModal').classList.add('hidden');
+                showCrmScreen();
+                showToast('Вход в CRM выполнен', 'success');
+            } else {
+                document.getElementById('crmLoginError').classList.remove('hidden');
+            }
+        };
+
+        function showCrmScreen() {
+            document.getElementById('surveyView').classList.add('hidden');
+            document.getElementById('crmView').classList.remove('hidden');
+            renderCrmSubmissions();
+        }
+
+        window.switchToSurveyView = function() {
+            document.getElementById('crmView').classList.add('hidden');
+            document.getElementById('surveyView').classList.remove('hidden');
+        };
+
+        // 8. Отрисовка CRM Куратора (строго без шаблонных приписок)
+        window.setCrmFilter = function(filterName) {
+            currentCrmFilter = filterName;
+            ['all', 'help', 'unread', 'bad'].forEach(f => {
+                const btn = document.getElementById(`flt-${f}`);
+                if (f === filterName) {
+                    btn.className = 'crm-flt px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white transition';
+                } else {
+                    btn.className = 'crm-flt px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition';
+                }
+            });
+            renderCrmSubmissions();
+        };
+
+        window.renderCrmSubmissions = function() {
+            const total = submissions.length;
+            const helpCount = submissions.filter(s => s.needHelp).length;
+
+            let qTotal = 0;
+            let points = 0;
+            submissions.forEach(s => {
+                if (s.ratings) {
+                    Object.values(s.ratings).forEach(v => {
+                        if (!v) return;
+                        qTotal++;
+                        if (v === 'great') points += 100;
+                        else if (v === 'good') points += 70;
+                        else if (v === 'bad') points += 20;
+                    });
+                }
+            });
+            const avgComfort = qTotal > 0 ? `${Math.round(points / qTotal)}%` : '—';
+
+            document.getElementById('crmTotalCount').textContent = total;
+            document.getElementById('crmAvgComfort').textContent = avgComfort;
+            document.getElementById('crmHelpCount').textContent = helpCount;
+
+            const search = (document.getElementById('crmSearchInput')?.value || '').trim().toLowerCase();
+            const filtered = submissions.filter(item => {
+                if (currentCrmFilter === 'help' && !item.needHelp) return false;
+                if (currentCrmFilter === 'unread' && item.status === 'done') return false;
+                if (currentCrmFilter === 'bad' && item.overall !== 'bad') return false;
+
+                if (search) {
+                    const hay = `${item.username || ''} ${item.opinion || ''} ${item.helpProblem || ''} ${(item.tags || []).join(' ')}`.toLowerCase();
+                    if (!hay.includes(search)) return false;
+                }
+                return true;
+            });
+
+            const container = document.getElementById('crmSubmissionsList');
+            if (!container) return;
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white dark:bg-[#111625] rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center space-y-2">
+                        <div class="text-slate-400 text-sm font-semibold">Реальных анкет от сотрудников пока нет</div>
+                        <div class="text-xs text-slate-500">Как только сотрудник заполнит опрос и нажмет «Отправить анкету», его ответ сразу появится здесь.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(item => {
+                const dateStr = formatTime(item.createdAt);
+                const cleanTgUser = (item.username || '').replace(/^@/, '');
+
+                // Блок 1 — Оценки (5 вопросов)
+                const ratingPills = ['q1', 'q2', 'q3', 'q4', 'q5'].map(k => {
+                    const val = item.ratings ? item.ratings[k] : null;
+                    const cls = val === 'great'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : val === 'good'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        : val === 'bad'
+                        ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        : 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+                    const label = val === 'great' ? 'Отлично' : val === 'good' ? 'Хорошо' : val === 'bad' ? 'Плохо' : '—';
+                    return `<span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${cls}">${questionLabels[k]}: <b>${label}</b></span>`;
+                }).join('');
+
+                // Выбранные сложности (строго простые плашки выбранных кнопок без авто-текста)
+                const userTags = Array.isArray(item.tags) ? item.tags.filter(t => t && t !== 'Без замечаний' && t !== 'Нужна помощь куратора') : [];
+                const tagsBadgesHtml = userTags.length > 0
+                    ? userTags.map(t => `<span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">${escapeHtml(t)}</span>`).join('')
+                    : `<span class="text-xs text-slate-500">Не выбрано</span>`;
+
+                // Блок 2 — Запрос «🆘 Нужна помощь куратора» (показывается только если сотрудник сам нажал кнопку, и содержит только его текст)
+                const helpAlertHtml = item.needHelp
+                    ? `
+                    <div class="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-extrabold text-rose-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                Блок 2 — Запрос «🆘 Нужна помощь куратора»
+                            </span>
+                            <a href="https://t.me/${encodeURIComponent(cleanTgUser)}" target="_blank" rel="noopener noreferrer" class="text-xs font-bold text-rose-300 hover:text-white underline flex items-center gap-1">
+                                <i class="fa-brands fa-telegram"></i> Ответить ${escapeHtml(item.username)}
+                            </a>
+                        </div>
+                        <p class="text-xs sm:text-sm text-rose-100 leading-relaxed font-medium whitespace-pre-wrap">${escapeHtml(item.helpProblem)}</p>
+                    </div>
+                    `
+                    : '';
+
+                // Блок 3 — «Мнение и предложения» (строго текст сотрудника или «Без комментария»)
+                const opinionDisplay = (item.opinion && item.opinion.trim() !== '') ? item.opinion : 'Без комментария';
+
+                const isDone = item.status === 'done';
+                const statusBadge = isDone
+                    ? `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"><i class="fa-solid fa-check mr-1"></i>Разобрано</span>`
+                    : `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20">Новое</span>`;
+
+                return `
+                    <div class="bg-white dark:bg-[#111625] rounded-2xl border ${item.needHelp ? 'border-rose-500/40' : 'border-slate-200 dark:border-slate-800'} p-5 shadow-sm space-y-4 animate-fade-in">
+                        <!-- a) Точный Telegram @username + время + фиксированный этап -->
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                            <div class="flex flex-wrap items-center gap-2.5">
+                                <a href="https://t.me/${encodeURIComponent(cleanTgUser)}" target="_blank" rel="noopener noreferrer" class="font-extrabold text-sm sm:text-base text-indigo-500 dark:text-indigo-400 hover:underline flex items-center gap-1.5">
+                                    <i class="fa-brands fa-telegram"></i>
+                                    ${escapeHtml(item.username)}
+                                </a>
+                                <span class="text-xs text-slate-400">• ${escapeHtml(item.stage || FIXED_STAGE)}</span>
+                                <span class="text-xs text-slate-500">• ${dateStr}</span>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                ${statusBadge}
+                                <button type="button" onclick="toggleSubmissionStatus('${item.id}')" class="px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold transition">
+                                    ${isDone ? 'Вернуть в новые' : 'Отметить разобранным'}
+                                </button>
+                                <button type="button" onclick="deleteSubmission('${item.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 transition" title="Удалить анкету">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- b) Блок 1 — Оценки -->
+                        <div class="space-y-1.5">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Блок 1 — Оценки:</div>
+                            <div class="flex flex-wrap gap-1.5">
+                                ${ratingPills}
+                            </div>
+                        </div>
+
+                        <!-- c) Выбранные сложности (простые плашки без авто-текста) -->
+                        <div class="space-y-1.5">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Выбранные сложности:</div>
+                            <div class="flex flex-wrap gap-1.5 items-center">
+                                ${tagsBadgesHtml}
+                            </div>
+                        </div>
+
+                        <!-- d) Блок 2 — Запрос «🆘 Нужна помощь куратора» (если выбран) -->
+                        ${helpAlertHtml}
+
+                        <!-- e) Блок 3 — «Мнение и предложения» -->
+                        <div class="space-y-1.5">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Блок 3 — Мнение и предложения:</div>
+                            <p class="text-xs sm:text-sm text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-[#0b0f1a] p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 whitespace-pre-wrap">${escapeHtml(opinionDisplay)}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        window.toggleSubmissionStatus = async function(id) {
+            const target = submissions.find(s => s.id === id);
+            if (!target) return;
+            const nextStatus = target.status === 'done' ? 'new' : 'done';
+            target.status = nextStatus;
+            renderCrmSubmissions();
+
+            if (db && currentUser && !String(id).startsWith('local-')) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'survey_responses', id);
+                    await updateDoc(docRef, { status: nextStatus });
+                } catch (e) {
+                    console.warn('Не удалось обновить статус в облаке:', e);
+                }
+            }
+        };
+
+        window.deleteSubmission = async function(id) {
+            submissions = submissions.filter(s => s.id !== id);
+            renderCrmSubmissions();
+            showToast('Анкета удалена', 'info');
+
+            if (db && currentUser && !String(id).startsWith('local-')) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'survey_responses', id);
+                    await deleteDoc(docRef);
+                } catch (e) {
+                    console.warn('Ошибка удаления из облака:', e);
+                }
+            }
+        };
+
+        window.clearAllSubmissions = async function() {
+            if (submissions.length === 0) {
+                showToast('Список анкет уже пуст', 'info');
+                return;
+            }
+            const idsToRemove = submissions.map(s => s.id);
+            submissions = [];
+            renderCrmSubmissions();
+            showToast('Все анкеты очищены', 'info');
+
+            if (db && currentUser) {
+                for (const id of idsToRemove) {
+                    if (!String(id).startsWith('local-')) {
+                        try {
+                            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'survey_responses', id);
+                            await deleteDoc(docRef);
+                        } catch (e) {
+                            console.warn('Ошибка удаления документа:', e);
+                        }
+                    }
+                }
+            }
+        };
+
+        // 9. Настройка безопасного Telegram Chat ID
+        window.saveCuratorChatId = async function() {
+            const val = document.getElementById('curatorChatIdInput').value.trim();
+            savedTelegramChatId = val;
+            updateTgStatusUi();
+
+            if (db && currentUser) {
+                try {
+                    const cfgRef = doc(db, 'artifacts', appId, 'public', 'data', 'crm_settings', 'telegram_config');
+                    await setDoc(cfgRef, { chatId: val, updatedAt: Date.now() });
+                } catch (e) {
+                    console.warn('Ошибка сохранения Chat ID:', e);
+                }
+            }
+            toggleModal('tgSetupModal');
+            showToast(val ? 'Chat ID сохранен! Новые анкеты будут дублироваться в TG.' : 'Дублирование в TG отключено (работает веб-CRM).', 'success');
+        };
+
+        window.testTelegramPush = async function() {
+            const val = document.getElementById('curatorChatIdInput').value.trim();
+            if (!val) {
+                showToast('Введите ваш цифровой Chat ID для проверки', 'error');
+                return;
+            }
+            try {
+                const res = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: val,
+                        text: '✅ <b>Тестовое подключение CRM успешно!</b>\nВсе новые анкеты сотрудников будут приходить сюда и сохраняться в вашей веб-CRM.',
+                        parse_mode: 'HTML'
+                    })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    showToast('Тестовое сообщение доставлено в ваш Telegram!', 'success');
+                } else {
+                    showToast('Бот не смог отправить сообщение. Убедитесь, что нажали /start в боте и ввели цифровой ID.', 'error');
+                }
+            } catch (e) {
+                showToast('Ошибка соединения с Telegram API', 'error');
+            }
+        };
+
+        function updateTgStatusUi() {
+            const statusEl = document.getElementById('crmChannelStatus');
+            const subEl = document.getElementById('crmChannelSub');
+            if (!statusEl || !subEl) return;
+            if (savedTelegramChatId) {
+                statusEl.textContent = 'Web CRM + Telegram';
+                subEl.textContent = `Chat ID: ${savedTelegramChatId}`;
+            } else {
+                statusEl.textContent = 'Облачная CRM';
+                subEl.textContent = 'Синхронизация со всех устройств';
+            }
+        }
+
+        // 10. Вспомогательные функции интерфейса
+        window.toggleTheme = function() {
+            document.documentElement.classList.toggle('dark');
+        };
+
+        window.toggleModal = function(id) {
+            document.getElementById(id).classList.toggle('hidden');
+        };
+
+        window.downloadStandaloneHtml = function() {
+            const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'index.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Файл index.html скачан!', 'success');
+        };
+
+        function formatTime(ts) {
+            if (!ts) return 'Только что';
+            const d = new Date(ts);
+            return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ', ' +
+                   d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+        }
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        window.showToast = function(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            let border = 'border-indigo-500';
+            let icon = 'fa-circle-info text-indigo-400';
+            if (type === 'success') {
+                border = 'border-emerald-500';
+                icon = 'fa-circle-check text-emerald-400';
+            } else if (type === 'error') {
+                border = 'border-rose-500';
+                icon = 'fa-triangle-exclamation text-rose-400';
+            }
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900 text-white border-l-4 ${border} shadow-xl text-xs sm:text-sm font-medium animate-fade-in`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.25s ease';
+                setTimeout(() => toast.remove(), 250);
+            }, 3200);
+        };
+
+        // Запуск при загрузке страницы
+        window.addEventListener('DOMContentLoaded', () => {
+            initCloudStorage();
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('page') === 'crm') {
+                openCrmLoginModal();
+            }
+        });
+    </script>
+</body>
+</html>
